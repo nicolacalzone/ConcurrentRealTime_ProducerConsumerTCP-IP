@@ -1,0 +1,6 @@
+*.o
+*_compiled
+/bin/
+build/
+*.exe
+*.out
