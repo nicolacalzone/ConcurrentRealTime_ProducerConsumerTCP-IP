@@ -2,14 +2,16 @@ PROGRAMS = TcpClient \
            TcpThreadedServer \
            prodcons_msgqueue
 
-all: $(PROGRAMS)
+COMPILED_PROGRAMS = $(addsuffix _compiled, $(PROGRAMS))
 
-TcpClient_compiled: TcpClient.c
-    gcc -o TcpClient_compiled TcpClient.c
-TcpThreadedServer_compiled: TcpThreadedServer.c -lpthread
-    gcc -o TcpThreadedServer_compiled TcpThreadedServer.c -lpthread
-prodcons_msgqueue_compiled: prodcons_msgqueue.c -lpthread
-    gcc -o prodcons_msgqueue_compiled prodcons_msgqueue.c -lpthread
+all: $(COMPILED_PROGRAMS)
 
+TcpThreadedServer: LDLIBS += -lpthread
+prodcons_msgqueue: LDLIBS += -lpthread
+
+%_compiled: %.c
+	$(CC) $(CFLAGS) -o $@ $< $(LDLIBS)
+
+# Clean target
 clean:
-    rm -f $(PROGRAMS)
+	$(RM) $(PROGRAMS)
