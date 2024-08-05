@@ -12,7 +12,7 @@ static int receive(int sd, void *buffer, int size)
   int totalSize = 0, currentSize;
   while (totalSize < size)
   {
-    currentSize = recv(sd, (char *)buffer /*+ totalSize*/, size - totalSize, 0);
+    currentSize = recv(sd, (char *)buffer + totalSize, size - totalSize, 0);
     if (currentSize <= 0)
     {
       // Error or connection closed
@@ -71,18 +71,22 @@ int main(int argc, char **argv)
   // Variable to hold the received number
   int receivedNumber;
 
-  // Receive the number from the server
-  if (receive(sd, &receivedNumber, sizeof(receivedNumber)) == -1)
+  // Loop to continuously receive numbers from the server
+  while (1)
   {
-    perror("recv");
-    close(sd);
-    exit(1);
+    // Receive the number from the server
+    if (receive(sd, &receivedNumber, sizeof(receivedNumber)) == -1)
+    {
+      perror("recv");
+      close(sd);
+      exit(1);
+    }
+
+    // Convert from network byte order and print the number
+    printf("Received number: %d\n", ntohl(receivedNumber));
   }
 
-  // Convert from network byte order and print the number
-  printf("Received number: %d\n", ntohl(receivedNumber));
-
-  // Close the socket
+  // Close the socket (never reached in this loop)
   close(sd);
   return 0;
 }
