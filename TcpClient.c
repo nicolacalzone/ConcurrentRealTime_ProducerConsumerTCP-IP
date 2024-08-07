@@ -81,8 +81,6 @@ int main(int argc, char **argv)
       close(sd);
       exit(1);
     }
-
-    // Convert from network byte order and print the number
     printf("Received number: %d\n", ntohl(receivedNumber));
   }
 
