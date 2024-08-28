@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/shm.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
@@ -9,11 +10,21 @@
 #include <pthread.h>
 
 #define MAX_THREADS 10
+#define SHM_KEY_MONITOR_SERVER 1234
 
 // Global variables
 int exit_status = 0;
 int client_id_counter = 0;
 pthread_mutex_t client_id_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+struct BufferData {
+  int receivedMessagesPerConsumer[MAX_THREADS];
+  int producedMessages;
+  int queueLenght;
+  int numOfConsumers;
+}; 
+
+struct BufferData *sharedBuf;
 
 // Simulate receiving an updated number
 int getUpdatedNumber()
@@ -61,13 +72,49 @@ static void *connectionHandler(void *arg)
   return NULL;
 }
 
+static void *readingProcess(void *arg){
+  while(1){
+    
+    printf("Number of messages in the queue: %lu\n", sharedBuf->queueLenght);  
+    printf("Number of produced elements so far: %d\n",sharedBuf->producedMessages);
+
+    for (int i = 0; i<sharedBuf->numOfConsumers; i++)
+      printf("consumer:%d, received: %d\n",i+1,sharedBuf->receivedMessagesPerConsumer[i]);
+
+    sleep(10);
+  }
+}
+
 // Main Program
 int main(int argc, char *argv[])
 {
   int sd, *arg;
-  int port;
+  int port, sharedMemId;;
   struct sockaddr_in sin, retSin;
   pthread_t threads[MAX_THREADS];
+  pthread_t serverReader;
+
+  /* Set-up shared memory */
+  sharedMemId = shmget(SHM_KEY_MONITOR_SERVER, sizeof(struct BufferData), SHM_R);
+  if(sharedMemId == -1)
+  {
+    perror("Error in shmget");
+    exit(0);
+  }
+  /* Shared memory attach b/w sharedBuf and sharedMem segment */
+  sharedBuf = shmat(sharedMemId, NULL, 0);
+  if(sharedBuf == (void *)-1)
+  {
+    perror("Error in shmat");
+    exit(0);
+  }  
+
+  /* Initialize buffer indexes */
+  sharedBuf->producedMessages = 0;
+  sharedBuf->queueLenght = 0;
+
+  /* Create serverReader thread */
+  pthread_create(&serverReader, NULL, readingProcess, NULL);
 
   // Check for correct usage
   if (argc < 2)
