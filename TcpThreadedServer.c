@@ -20,7 +20,7 @@ pthread_mutex_t client_id_mutex = PTHREAD_MUTEX_INITIALIZER;
 struct BufferData {
   int receivedMessagesPerConsumer[MAX_THREADS];
   int producedMessages;
-  int queueLenght;
+  int queueLength;
   int numOfConsumers;
 }; 
 
@@ -75,7 +75,7 @@ static void *connectionHandler(void *arg)
 static void *readingProcess(void *arg){
   while(1){
     
-    printf("Number of messages in the queue: %lu\n", sharedBuf->queueLenght);  
+    printf("Number of messages in the queue: %lu\n", sharedBuf->queueLength);  
     printf("Number of produced elements so far: %d\n",sharedBuf->producedMessages);
 
     for (int i = 0; i<sharedBuf->numOfConsumers; i++)
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
 
   /* Initialize buffer indexes */
   sharedBuf->producedMessages = 0;
-  sharedBuf->queueLenght = 0;
+  sharedBuf->queueLength = 0;
 
   /* Create serverReader thread */
   pthread_create(&serverReader, NULL, readingProcess, NULL);
