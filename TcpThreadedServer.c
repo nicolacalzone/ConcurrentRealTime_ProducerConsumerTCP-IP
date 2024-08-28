@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#define MAX_THREADS 10
+#define MAX_THREADS 250
 #define SHM_KEY_MONITOR_SERVER 1234
 
 // Global variables
@@ -17,14 +17,14 @@ int exit_status = 0;
 int client_id_counter = 0;
 pthread_mutex_t client_id_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-struct BufferData {
+struct BufferDataMonitorServer {
   int receivedMessagesPerConsumer[MAX_THREADS];
   int producedMessages;
   int queueLength;
   int numOfConsumers;
 }; 
 
-struct BufferData *sharedBuf;
+struct BufferDataMonitorServer *sharedBuf;
 
 // Simulate receiving an updated number
 int getUpdatedNumber()
@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
   pthread_t serverReader;
 
   /* Set-up shared memory */
-  sharedMemId = shmget(SHM_KEY_MONITOR_SERVER, sizeof(struct BufferData), SHM_R);
+  sharedMemId = shmget(SHM_KEY_MONITOR_SERVER, sizeof(struct BufferDataMonitorServer), SHM_R);
   if(sharedMemId == -1)
   {
     perror("Error in shmget");

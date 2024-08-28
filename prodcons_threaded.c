@@ -11,7 +11,9 @@
 
 #define MAX_THREADS 250
 
-#define SHM_KEY 5678 
+#define SHM_KEY 5678
+
+#define SHM_KEY_MONITOR_SERVER 1234
 
 
 #define BUFFER_SIZE 264
@@ -32,7 +34,6 @@ struct BufferData {
   int buffer[BUFFER_SIZE];
   int receivedMessagesPerConsumer[MAX_THREADS];
   int producedMessages;
-  struct msgbuf *msgFromQueue;
   
   /* The mutex used to protect shared data */
   pthread_mutex_t mutex;
@@ -52,7 +53,21 @@ struct BufferData {
    
 };
 
+
+struct BufferDataMonitorServer {
+  int receivedMessagesPerConsumer[MAX_THREADS];
+  int producedMessages;
+  int queueLength;
+  int numOfConsumers;
+};
+
+
+//structure of shared buffer between monitor and server
+
+
 struct BufferData *sharedBuf;
+
+struct BufferDataMonitorServer *sharedBufMonitorServer;
 
 
 int numOfProducedMessages = 0;
@@ -61,6 +76,7 @@ int numOfProducedMessages = 0;
 static void *monitor(void *arg)
 {
 
+  sharedBufMonitorServer->numOfConsumers = sharedBuf->numOfConsumers;
   while(1){
 
       //  Buffer empty condition corresponds to readIdx == writeIdx
@@ -82,13 +98,17 @@ static void *monitor(void *arg)
         num_elements = BUFFER_SIZE - diff;
       }
     }
+
+    sharedBufMonitorServer->queueLength = num_elements;
+    sharedBufMonitorServer->producedMessages = sharedBuf->producedMessages;
+    
     printf("Number of messages in the queue: %lu\n", num_elements);  
 
 
     printf("the number of produced elements so far:%d\n",sharedBuf->producedMessages);
 
     for (int i = 0;i<sharedBuf->numOfConsumers;i++){
-      
+      sharedBufMonitorServer->receivedMessagesPerConsumer[i] = sharedBuf->receivedMessagesPerConsumer[i];
       printf("consumer:%d, received: %d\n",i+1,sharedBuf->receivedMessagesPerConsumer[i]);
     
     }
@@ -109,6 +129,7 @@ static void *consumer(void *arg)
 
   while(1)
   {
+    // printf("fuck you!\n");
 /* Enter critical section */
     pthread_mutex_lock(&sharedBuf->mutex);
 /* If the buffer is empty, wait for new data */
@@ -116,6 +137,8 @@ static void *consumer(void *arg)
     {
       pthread_cond_wait(&sharedBuf->dataAvailable, &sharedBuf->mutex);
     }
+
+    // printf("fuck you After lock!\n");
 /* At this point data are available
    Get the item from the buffer */
 
@@ -128,6 +151,9 @@ static void *consumer(void *arg)
     
     numOfReceivedMessages += 1;
     sharedBuf->receivedMessagesPerConsumer[ID-1] = numOfReceivedMessages;
+
+    // printf("fuck you After !\n");
+    // printf("received messages:%d\n",sharedBuf->receivedMessagesPerConsumer[ID-1]);
     // sleep(4);
 
     // item = sharedBuf->buffer[readIdx];
@@ -172,7 +198,7 @@ static void *producer(void *arg)
 
     sharedBuf->producedMessages = numOfProducedMessages;
 
-    // sleep();
+    // sleep(1);
     
     sharedBuf->writeIdx = (sharedBuf->writeIdx + 1)%BUFFER_SIZE;
 /* Signal data avilability */
@@ -189,6 +215,7 @@ int main(int argc, char *args[])
   int nConsumers;
   int i;
   int sharedMemId;
+  int sharedMemMonServerId;
 
 /* The number of consumer is passed as argument */
   if(argc != 2)
@@ -207,6 +234,21 @@ int main(int argc, char *args[])
     exit(0);
   }
   sharedBuf = shmat(sharedMemId, NULL, 0);
+  if(sharedBuf == (void *)-1)
+  {
+    perror("Error in shmat");
+    exit(0);
+  }  
+
+
+/* Set-up shared memory for monitor and server */
+  sharedMemMonServerId = shmget(SHM_KEY_MONITOR_SERVER, sizeof(struct BufferDataMonitorServer),IPC_CREAT | SHM_R | SHM_W);
+  if(sharedMemMonServerId == -1)
+  {
+    perror("Error in shmget");
+    exit(0);
+  }
+  sharedBufMonitorServer = shmat(sharedMemMonServerId, NULL, 0);
   if(sharedBuf == (void *)-1)
   {
     perror("Error in shmat");
