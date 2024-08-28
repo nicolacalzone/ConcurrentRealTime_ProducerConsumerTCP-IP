@@ -1,0 +1,2 @@
+#command to remove all open shared memories
+ipcs -m | awk 'NR>3 {print $2}' | xargs -n 1 ipcrm -m
