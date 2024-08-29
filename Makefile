@@ -4,6 +4,8 @@ PROGRAMS = TcpClient \
 
 COMPILED_PROGRAMS = $(addsuffix _compiled, $(PROGRAMS))
 
+CFLAGS = -Iinclude
+
 all: $(COMPILED_PROGRAMS)
 
 TcpThreadedServer: LDLIBS += -lpthread

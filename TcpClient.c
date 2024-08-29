@@ -6,10 +6,13 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include "utils.h"
 
 static int receive(int sd, void *buffer, int size)
 {
   int totalSize = 0, currentSize;
+
+  int counter = 0;
   while (totalSize < size)
   {
     currentSize = recv(sd, (char *)buffer + totalSize, size - totalSize, 0);
@@ -18,6 +21,7 @@ static int receive(int sd, void *buffer, int size)
       // Error or connection closed
       return -1;
     }
+
     totalSize += currentSize;
   }
   // Success
@@ -70,18 +74,95 @@ int main(int argc, char **argv)
 
   // Variable to hold the received number
   int receivedNumber;
+  int counter=0;
+  int numOfConsumers = 0;
+  int consumer = 0;
+
+  int producedMessage;
+  int queueLength;
+  int receivedmessage;
+
+
+
+  // Receive num of consumers
+  if (receive(sd, &numOfConsumers, sizeof(numOfConsumers)) == -1)
+  {
+    perror("recv");
+    close(sd);
+    exit(1);
+  }  
 
   // Loop to continuously receive numbers from the server
   while (1)
   {
     // Receive the number from the server
-    if (receive(sd, &receivedNumber, sizeof(receivedNumber)) == -1)
+    if (receive(sd, &producedMessage, sizeof(producedMessage)) == -1)
     {
       perror("recv");
       close(sd);
       exit(1);
     }
-    printf("Received number: %d\n", ntohl(receivedNumber));
+    else{
+      printf("produced Messages %d\n",ntohl(producedMessage));
+    }
+
+    // Receive the number from the server
+    if (receive(sd, &queueLength, sizeof(queueLength)) == -1)
+    {
+      perror("recv");
+      close(sd);
+      exit(1);
+    }
+    else{
+      printf("Queue Length %d\n",ntohl(queueLength));
+    }
+
+    for(int i = 0;i<numOfConsumers;++i){
+      
+      // int receivedMessagesByte = htonl(sharedBuf->receivedMessagesPerConsumer[i]);
+   // Receive the number from the server
+      if (receive(sd, &receivedmessage, sizeof(receivedmessage)) == -1)
+      {
+        perror("recv");
+        close(sd);
+        exit(1);
+      }
+      else
+        {
+          printf("Consumer %d received:%d\n",i,ntohl(receivedmessage));
+        }     
+    }        
+
+
+    //print produced messages
+    // if(counter == 0){
+    //   printf("produced Messages %d\n",ntohl(receivedNumber));
+    //   counter++;
+    // }
+
+    // //print queue length
+    // if(counter == 1){
+    //   printf("Queue Length %d\n",ntohl(receivedNumber));
+    //   counter++;
+    // }
+
+    // //print received messages for every consumer
+    // // printf("num of consumers:%d",numOfConsumers);
+    // if(counter >= 2){
+    //   // for(int i = 0;i<numOfConsumers;++i){
+    //   printf("Consumer %d received:%d\n",consumer,ntohl(receivedNumber));
+    //   counter++;
+    //   consumer++;
+    //   // }
+
+    // }
+
+    //cehck if we are at the end of the counter loop
+    // if((counter + 1) % (1+numOfConsumers) == 0){
+    //   counter = 0;
+    //   consumer = 0;
+    // }
+    // printf("Received number: %d\n", ntohl(receivedNumber));
   }
 
   // Close the socket (never reached in this loop)

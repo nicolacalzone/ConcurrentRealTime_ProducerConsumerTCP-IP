@@ -8,21 +8,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
-
-#define MAX_THREADS 250
-#define SHM_KEY_MONITOR_SERVER 1234
+#include "utils.h"
 
 // Global variables
 int exit_status = 0;
 int client_id_counter = 0;
 pthread_mutex_t client_id_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-struct BufferDataMonitorServer {
-  int receivedMessagesPerConsumer[MAX_THREADS];
-  int producedMessages;
-  int queueLength;
-  int numOfConsumers;
-}; 
 
 struct BufferDataMonitorServer *sharedBuf;
 
@@ -36,6 +27,19 @@ int getUpdatedNumber()
 // Function to handle the connection
 static void handleConnection(int currSd, int client_id)
 {
+
+
+    int numOfConsumersByte = sharedBuf->numOfConsumers;
+  //send the num of consumers
+    if (send(currSd, &numOfConsumersByte, sizeof(numOfConsumersByte), 0) == -1)
+    {
+      perror("Failed to send number");
+    }
+    else
+    {
+      printf("num of consumers: %d to client %d\n", numOfConsumersByte, client_id);
+    }  
+
   for (;;)
   {
     int numberToSend = getUpdatedNumber(); // Get the updated number
