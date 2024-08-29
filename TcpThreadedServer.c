@@ -39,17 +39,45 @@ static void handleConnection(int currSd, int client_id)
   for (;;)
   {
     int numberToSend = getUpdatedNumber(); // Get the updated number
-    int netNumber = htonl(numberToSend);   // Convert to network byte order
+    int producedMessagesByte = htonl(sharedBuf->producedMessages);
+    int queueLengthByte = htonl(sharedBuf->queueLength);
+    // int numOfConsumerByte = htonl(sharedBuf->numOfConsumers);
+   // Convert to network byte order
 
     // Send the number to the client
-    if (send(currSd, &netNumber, sizeof(netNumber), 0) == -1)
+    if (send(currSd, &producedMessagesByte, sizeof(producedMessagesByte), 0) == -1)
     {
       perror("Failed to send number");
       break;
     }
     else
     {
-      printf("Sent number %d to client %d\n", numberToSend, client_id);
+      printf("produced: %d to client %d\n", producedMessagesByte, client_id);
+    }
+
+    if (send(currSd, &queueLengthByte, sizeof(queueLengthByte), 0) == -1)
+    {
+      perror("Failed to send number");
+      break;
+    }
+    else
+    {
+      printf("Queue: %d to client %d\n", queueLengthByte, client_id);
+    }    
+
+
+    for(int i = 0;i<sharedBuf->numOfConsumers;++i){
+      
+      int receivedMessagesByte = htonl(sharedBuf->receivedMessagesPerConsumer[i]);
+        if (send(currSd, &receivedMessagesByte, sizeof(receivedMessagesByte), 0) == -1)
+      {
+        perror("Failed to send number");
+        break;
+      }
+      else
+      {
+        printf("Queue: %d to client %d\n", receivedMessagesByte, client_id);
+      }     
     }
 
     // Sleep for a short period to simulate time delay between updates
