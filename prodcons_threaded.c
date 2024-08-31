@@ -8,15 +8,7 @@
 #include <sys/shm.h>
 #include <semaphore.h>
 #include <unistd.h>
-
-#define MAX_THREADS 250
-
-#define SHM_KEY 5678
-
-#define SHM_KEY_MONITOR_SERVER 1234
-
-
-#define BUFFER_SIZE 264
+#include "utils.h"
 
 
 /* Shared Buffer, indexes and semaphores are held in shared memory
@@ -52,15 +44,6 @@ struct BufferData {
   int numOfConsumers;
    
 };
-
-
-struct BufferDataMonitorServer {
-  int receivedMessagesPerConsumer[MAX_THREADS];
-  int producedMessages;
-  int queueLength;
-  int numOfConsumers;
-};
-
 
 //structure of shared buffer between monitor and server
 
@@ -227,7 +210,7 @@ int main(int argc, char *args[])
 
 
 /* Set-up shared memory */
-  sharedMemId = shmget(SHM_KEY, sizeof(struct BufferData),IPC_CREAT | SHM_R | SHM_W);
+  sharedMemId = shmget(SHM_KEY, sizeof(struct BufferData), IPC_CREAT | SHM_R | SHM_W);
   if(sharedMemId == -1)
   {
     perror("Error in shmget");
