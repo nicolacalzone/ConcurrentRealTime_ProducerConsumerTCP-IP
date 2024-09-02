@@ -7,10 +7,10 @@
 #define BUFFER_SIZE 264
 
 struct BufferDataMonitorServer {
-  int receivedMessagesPerConsumer[MAX_THREADS];
+  int receivedMessagesPerConsumer[MAX_THREADS]; // every index is a consumer. every vec[index] is the amt of receivedMessages
   int producedMessages;
-  int queueLength;
-  int numOfConsumers;
+  int queueSize;
+  int consumersAmt;
 };
 
 

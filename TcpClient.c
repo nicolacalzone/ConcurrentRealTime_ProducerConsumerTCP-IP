@@ -6,35 +6,32 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include "utils.h"
+/* For shared memory*/
+#include "sharedMem.h"
 
-static int receive(int sd, void *buffer, int size)
-{
-  int totalSize = 0, currentSize;
+/* Definition of Functions */
+static int receive(int sd, void *buffer, int size);
 
-  int counter = 0;
-  while (totalSize < size)
-  {
-    currentSize = recv(sd, (char *)buffer + totalSize, size - totalSize, 0);
-    if (currentSize <= 0)
-    {
-      // Error or connection closed
-      return -1;
-    }
-
-    totalSize += currentSize;
-  }
-  // Success
-  return 0;
-}
-
+/* MAIN */
 int main(int argc, char **argv)
 {
+  /* Tcp/Ip needed variables */
   char hostname[100];
   int sd;
   int port;
   struct sockaddr_in sin;
   struct hostent *hp;
+  
+  /* Prod/Con needed variables */
+  int receivedNumber;
+  int counter=0;
+  int consumersAmt = 0;
+  int consumer = 0;
+  int producedMessage;
+  int queueSize;
+  int receivedmessage;
+  int len = sizeof(struct BufferDataMonitorServer);
+  unsigned int netLen = htonl(len);
 
   // Check number of arguments and get IP address and port
   if (argc < 3)
@@ -72,20 +69,8 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  // Variable to hold the received number
-  int receivedNumber;
-  int counter=0;
-  int numOfConsumers = 0;
-  int consumer = 0;
-
-  int producedMessage;
-  int queueLength;
-  int receivedmessage;
-
-
-
   // Receive num of consumers
-  if (receive(sd, &numOfConsumers, sizeof(numOfConsumers)) == -1)
+  if (receive(sd, &consumersAmt, sizeof(consumersAmt)) == -1)
   {
     perror("recv");
     close(sd);
@@ -95,6 +80,14 @@ int main(int argc, char **argv)
   // Loop to continuously receive numbers from the server
   while (1)
   {
+    /* Convert the integer number into network byte order */
+    /* Send number of characters */
+    if(send(sd, &netLen, sizeof(netLen), 0) == -1)
+    {
+      perror("send");
+      exit(1);
+    }
+    
     // Receive the number from the server
     if (receive(sd, &producedMessage, sizeof(producedMessage)) == -1)
     {
@@ -107,17 +100,17 @@ int main(int argc, char **argv)
     }
 
     // Receive the number from the server
-    if (receive(sd, &queueLength, sizeof(queueLength)) == -1)
+    if (receive(sd, &queueSize, sizeof(queueSize)) == -1)
     {
       perror("recv");
       close(sd);
       exit(1);
     }
     else{
-      printf("Queue Length %d\n",ntohl(queueLength));
+      printf("Queue Length %d\n",ntohl(queueSize));
     }
 
-    for(int i = 0;i<numOfConsumers;++i){
+    for(int i=0; i<consumersAmt; i++){
       
       // int receivedMessagesByte = htonl(sharedBuf->receivedMessagesPerConsumer[i]);
    // Receive the number from the server
@@ -147,9 +140,9 @@ int main(int argc, char **argv)
     // }
 
     // //print received messages for every consumer
-    // // printf("num of consumers:%d",numOfConsumers);
+    // // printf("num of consumers:%d",consumersAmt);
     // if(counter >= 2){
-    //   // for(int i = 0;i<numOfConsumers;++i){
+    //   // for(int i = 0;i<consumersAmt;++i){
     //   printf("Consumer %d received:%d\n",consumer,ntohl(receivedNumber));
     //   counter++;
     //   consumer++;
@@ -158,7 +151,7 @@ int main(int argc, char **argv)
     // }
 
     //cehck if we are at the end of the counter loop
-    // if((counter + 1) % (1+numOfConsumers) == 0){
+    // if((counter + 1) % (1+consumersAmt) == 0){
     //   counter = 0;
     //   consumer = 0;
     // }
@@ -167,5 +160,29 @@ int main(int argc, char **argv)
 
   // Close the socket (never reached in this loop)
   close(sd);
+  return 0;
+}
+
+// ---------------------------------------------------------------------------------------------------
+
+/* Description of Functions */
+
+static int receive(int sd, void *buffer, int size)
+{
+  int totalSize = 0, currentSize;
+
+  int counter = 0;
+  while (totalSize < size)
+  {
+    currentSize = recv(sd, (char *)buffer + totalSize, size - totalSize, 0);
+    if (currentSize <= 0)
+    {
+      // Error or connection closed
+      return -1;
+    }
+
+    totalSize += currentSize;
+  }
+  // Success
   return 0;
 }
