@@ -15,7 +15,7 @@
 
 /* Global variables */
 int exit_status = 0;
-int client_id_counter = 0;
+int client_id = 0;
 pthread_mutex_t client_id_mutex = PTHREAD_MUTEX_INITIALIZER;
 struct BufferDataMonitorServer *sharedBuf;
 
@@ -24,6 +24,7 @@ static void *connectionHandler(void *arg);
 static void handleConnection(int currSd, int client_id);
 int getUpdatedData();
 int generateId();
+void handle_signal(int signal);
 
 /* MAIN */
 int main(int argc, char *argv[])
@@ -121,10 +122,13 @@ int main(int argc, char *argv[])
 
     currSd[1] = generateId();
 
-    printf("Connection received from %s with client ID %d\n", inet_ntoa(retSin.sin_addr), currSd[1]);
+    printf("Connection received from: %s with clientId: %d\n", inet_ntoa(retSin.sin_addr), currSd[1]);
 
     // Connection received, start a new thread serving the connection
     pthread_create(&threads[i], NULL, connectionHandler, currSd);
+
+    //signal(SIGINT, handle_signal);
+    //signal(SIGTSTP, handle_signal);
   }
 
   return 0; // never reached
@@ -135,15 +139,15 @@ int main(int argc, char *argv[])
 
 /* Description of Functions */
 
-int getUpdatedData(){
-
-}
-
-int generateId(){
-  pthread_mutex_lock(&client_id_mutex);
-  client_id_counter++;
-  pthread_mutex_unlock(&client_id_mutex);
-  return client_id_counter;
+// Thread routine to handle the connection
+static void *connectionHandler(void *arg)
+{
+  int currSock = ((int *)arg)[0];
+  int client_id = ((int *)arg)[1];
+  free(arg);
+  handleConnection(currSock, client_id);
+  pthread_exit(0);
+  return NULL;
 }
 
 // Function to handle the connection
@@ -162,32 +166,32 @@ static void handleConnection(int currSd, int client_id)
 
   for (;;)
   {
-    //int numberToSend = getUpdatedData(); // Get the updated data
+    /* Gets update data from the shared buffer 
+       and converts it to network byte order */
+    int producedMessagesNBO, queueSizeNBO;
+    convertUpdatedData(&producedMessagesNBO, &queueSizeNBO); 
 
-    // Convert to network byte order
-    int producedMessagesByte = htonl(sharedBuf->producedMessages);
-    int queueSizeByte = htonl(sharedBuf->queueSize);
 
-    // Send the number to the client
-    if (send(currSd, &producedMessagesByte, sizeof(producedMessagesByte), 0) == -1)
+  /* Send Produced Messages */
+    if (send(currSd, &producedMessagesNBO, sizeof(producedMessagesNBO), 0) == -1)
     {
       perror("Failed to send number");
       break;
     }
     else
     {
-      printf("produced: %d to client %d\n", producedMessagesByte, client_id);
+      printf("produced: %d to client %d\n", producedMessagesNBO, client_id);
     }
-
-    if (send(currSd, &queueSizeByte, sizeof(queueSizeByte), 0) == -1)
+  /* Send Queue Size */
+    if (send(currSd, &queueSizeNBO, sizeof(queueSizeNBO), 0) == -1)
     {
       perror("Failed to send number");
       break;
     }
     else
     {
-      printf("Queue: %d to client %d\n", sharedBuf->queueSize, client_id);
-    }    
+      printf("Queue size [byte]: %d to client %d\n", queueSizeNBO, client_id);
+    }
 
 
     for(int i = 0;i<sharedBuf->consumersAmt;++i){
@@ -200,7 +204,7 @@ static void handleConnection(int currSd, int client_id)
       }
       else
       {
-        printf("Queue: %d to client %d\n", receivedMessagesByte, client_id);
+        printf("Messages byte: %d to client %d\n", receivedMessagesByte, client_id);
       }     
     }
   }
@@ -210,15 +214,18 @@ static void handleConnection(int currSd, int client_id)
   close(currSd);
 }
 
-// Thread routine to handle the connection
-static void *connectionHandler(void *arg)
-{
-  int currSock = ((int *)arg)[0];
-  int client_id = ((int *)arg)[1];
-  free(arg);
-  handleConnection(currSock, client_id);
-  pthread_exit(0);
-  return NULL;
+
+void convertUpdatedData(int *producedMessagesByte, int *queueSizeByte){
+    producedMessagesByte = htonl(sharedBuf->producedMessages);
+    queueSizeByte = htonl(sharedBuf->queueSize);
+    return NULL;
+}
+
+int generateId(){
+  pthread_mutex_lock(&client_id_mutex);
+  client_id++;
+  pthread_mutex_unlock(&client_id_mutex);
+  return client_id;
 }
 
 /*static void *readingProcess(void *arg){

@@ -149,13 +149,14 @@ static void *monitor(void *arg)
     sharedBufMonitorServer->queueSize = elementsAmt;
     sharedBufMonitorServer->producedMessages = sharedBuf->producedMessages;
     
-    printf("Amount of messages present in the queue: %lu\n", elementsAmt);  
-    printf("the number of produced elements so far:%d\n",sharedBuf->producedMessages);
+    printf("Amount of messages present in the queue: %d\n", elementsAmt);  
+    printf("the number of produced elements until now:%d\n",sharedBuf->producedMessages);
+
 
     for (int i = 0;i<sharedBuf->consumersAmt;i++){
       sharedBufMonitorServer->receivedMessagesPerConsumer[i] = sharedBuf->receivedMessagesPerConsumer[i];
-      printf("consumer:%d, received: %d\n",i+1,sharedBuf->receivedMessagesPerConsumer[i]);
-    
+      printf("Consumer #%d has received: %d\t",i+1,sharedBuf->receivedMessagesPerConsumer[i]);
+      printf("%%: %0.2f\n", (sharedBuf->receivedMessagesPerConsumer[i] / (float)sharedBuf->producedMessages) * 100);
     }
     sleep(3);
   }
