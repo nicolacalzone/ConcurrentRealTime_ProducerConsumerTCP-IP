@@ -1,8 +1,8 @@
 PROGRAMS = TcpClient \
-           TcpThreadedServer \
-           prodcons_threaded
+           TcpServer \
+           prodConMonitor
 
-COMPILED_PROGRAMS = $(addsuffix _compiled, $(PROGRAMS))
+COMPILED_PROGRAMS = $(addsuffix _executable, $(PROGRAMS))
 
 CFLAGS = -Iinclude
 
@@ -11,8 +11,8 @@ all: $(COMPILED_PROGRAMS)
 TcpThreadedServer: LDLIBS += -lpthread
 prodcons_threaded: LDLIBS += -lpthread
 
-%_compiled: %.c
+%_executable: %.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDLIBS)
 
 clean:
-	$(RM) $(PROGRAMS)
+	$(RM) $(COMPILED_PROGRAMS)

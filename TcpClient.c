@@ -95,6 +95,13 @@ int main(int argc, char **argv)
   // Loop to continuously receive numbers from the server
   while (1)
   {
+    // int stop = htonl(0);
+    // if (send(sd, &stop, sizeof(stop), 0) == -1){
+    //   perror("send");
+    //   close(sd);
+    //   exit(1);
+
+    // }
     // Receive the number from the server
     if (receive(sd, &producedMessage, sizeof(producedMessage)) == -1)
     {

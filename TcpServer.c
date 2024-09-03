@@ -3,7 +3,6 @@
 #include <sys/socket.h>
 #include <sys/shm.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -11,18 +10,9 @@
 #include "utils.h"
 
 // Global variables
-int exit_status = 0;
-int client_id_counter = 0;
-pthread_mutex_t client_id_mutex = PTHREAD_MUTEX_INITIALIZER;
+int EXIT = 0;
 
 struct BufferDataMonitorServer *sharedBuf;
-
-// Simulate receiving an updated number
-int getUpdatedNumber()
-{
-  static int number = 42; // Initial number
-  return number++;
-}
 
 // Function to handle the connection
 static void handleConnection(int currSd, int client_id)
@@ -35,18 +25,12 @@ static void handleConnection(int currSd, int client_id)
     {
       perror("Failed to send number");
     }
-    else
-    {
-      printf("num of consumers: %d to client %d\n", numOfConsumersByte, client_id);
-    }  
 
-  for (;;)
+  while(1)
   {
-    int numberToSend = getUpdatedNumber(); // Get the updated number
+
     int producedMessagesByte = htonl(sharedBuf->producedMessages);
     int queueLengthByte = htonl(sharedBuf->queueLength);
-    // int numOfConsumerByte = htonl(sharedBuf->numOfConsumers);
-   // Convert to network byte order
 
     // Send the number to the client
     if (send(currSd, &producedMessagesByte, sizeof(producedMessagesByte), 0) == -1)
@@ -54,21 +38,12 @@ static void handleConnection(int currSd, int client_id)
       perror("Failed to send number");
       break;
     }
-    else
-    {
-      printf("produced: %d to client %d\n", producedMessagesByte, client_id);
-    }
 
     if (send(currSd, &queueLengthByte, sizeof(queueLengthByte), 0) == -1)
     {
       perror("Failed to send number");
       break;
     }
-    else
-    {
-      printf("Queue: %d to client %d\n", queueLengthByte, client_id);
-    }    
-
 
     for(int i = 0;i<sharedBuf->numOfConsumers;++i){
       
@@ -77,15 +52,11 @@ static void handleConnection(int currSd, int client_id)
       {
         perror("Failed to send number");
         break;
-      }
-      else
-      {
-        printf("Queue: %d to client %d\n", receivedMessagesByte, client_id);
-      }     
+      }    
     }
 
     // Sleep for a short period to simulate time delay between updates
-    sleep(3);
+    sleep(0.5);
   }
 
   // Close the connection after sending the number
@@ -104,19 +75,6 @@ static void *connectionHandler(void *arg)
   return NULL;
 }
 
-static void *readingProcess(void *arg){
-  while(1){
-    
-    printf("Number of messages in the queue: %lu\n", sharedBuf->queueLength);  
-    printf("Number of produced elements so far: %d\n",sharedBuf->producedMessages);
-
-    for (int i = 0; i<sharedBuf->numOfConsumers; i++)
-      printf("consumer:%d, received: %d\n",i+1,sharedBuf->receivedMessagesPerConsumer[i]);
-
-    sleep(10);
-  }
-}
-
 // Main Program
 int main(int argc, char *argv[])
 {
@@ -124,10 +82,11 @@ int main(int argc, char *argv[])
   int port, sharedMemId;;
   struct sockaddr_in sin, retSin;
   pthread_t threads[MAX_THREADS];
-  pthread_t serverReader;
 
+
+  key_t keyForMonitor = ftok("tmp",SHM_KEY_MONITOR_SERVER);
   /* Set-up shared memory */
-  sharedMemId = shmget(SHM_KEY_MONITOR_SERVER, sizeof(struct BufferDataMonitorServer), SHM_R);
+  sharedMemId = shmget(keyForMonitor, sizeof(struct BufferDataMonitorServer), SHM_R);
   if(sharedMemId == -1)
   {
     perror("Error in shmget");
@@ -144,9 +103,6 @@ int main(int argc, char *argv[])
   /* Initialize buffer indexes */
   sharedBuf->producedMessages = 0;
   sharedBuf->queueLength = 0;
-
-  /* Create serverReader thread */
-  pthread_create(&serverReader, NULL, readingProcess, NULL);
 
   // Check for correct usage
   if (argc < 2)
@@ -203,12 +159,7 @@ int main(int argc, char *argv[])
       exit(1);
     }
 
-    // Generate a unique client ID
-    pthread_mutex_lock(&client_id_mutex);
-    arg[1] = client_id_counter++;
-    pthread_mutex_unlock(&client_id_mutex);
-
-    printf("Connection received from %s with client ID %d\n", inet_ntoa(retSin.sin_addr), arg[1]);
+    arg[1] = i;
 
     // Connection received, start a new thread serving the connection
     pthread_create(&threads[i], NULL, connectionHandler, arg);

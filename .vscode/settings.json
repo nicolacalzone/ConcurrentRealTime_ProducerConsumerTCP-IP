@@ -19,6 +19,7 @@
         "*.asm": "asm-collection",
         "cstdio": "c",
         "cctype": "cpp",
-        "unistd.h": "c"
+        "unistd.h": "c",
+        "signal.h": "c"
     }
 }
