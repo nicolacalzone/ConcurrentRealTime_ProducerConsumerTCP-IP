@@ -25,6 +25,9 @@ static void handleConnection(int currSd, int client_id);
 int getUpdatedData();
 int generateId();
 void handle_signal(int signal);
+uint64_t htonll(uint64_t value);
+uint64_t ntohll(uint64_t value);
+void convertUpdatedData(uint64_t *first, uint64_t *second);
 
 /* MAIN */
 int main(int argc, char *argv[])
@@ -168,7 +171,7 @@ static void handleConnection(int currSd, int client_id)
   {
     /* Gets update data from the shared buffer 
        and converts it to network byte order */
-    int producedMessagesNBO, queueSizeNBO;
+    uint64_t producedMessagesNBO, queueSizeNBO;
     convertUpdatedData(&producedMessagesNBO, &queueSizeNBO); 
 
 
@@ -180,7 +183,7 @@ static void handleConnection(int currSd, int client_id)
     }
     else
     {
-      printf("produced: %d to client %d\n", producedMessagesNBO, client_id);
+      printf("produced: %ld to client %d\n", producedMessagesNBO, client_id);
     }
   /* Send Queue Size */
     if (send(currSd, &queueSizeNBO, sizeof(queueSizeNBO), 0) == -1)
@@ -190,13 +193,13 @@ static void handleConnection(int currSd, int client_id)
     }
     else
     {
-      printf("Queue size [byte]: %d to client %d\n", queueSizeNBO, client_id);
+      printf("Queue size [byte]: %ld to client %d\n", queueSizeNBO, client_id);
     }
 
 
     for(int i = 0;i<sharedBuf->consumersAmt;++i){
       
-      int receivedMessagesByte = htonl(sharedBuf->receivedMessagesPerConsumer[i]);
+      uint64_t receivedMessagesByte = htonll(sharedBuf->receivedMessagesPerConsumer[i]);
         if (send(currSd, &receivedMessagesByte, sizeof(receivedMessagesByte), 0) == -1)
       {
         perror("Failed to send number");
@@ -204,7 +207,7 @@ static void handleConnection(int currSd, int client_id)
       }
       else
       {
-        printf("Messages byte: %d to client %d\n", receivedMessagesByte, client_id);
+        printf("Messages byte: %ld to client %d\n", receivedMessagesByte, client_id);
       }     
     }
   }
@@ -215,11 +218,11 @@ static void handleConnection(int currSd, int client_id)
 }
 
 
-void convertUpdatedData(int *producedMessagesByte, int *queueSizeByte){
-    producedMessagesByte = htonl(sharedBuf->producedMessages);
-    queueSizeByte = htonl(sharedBuf->queueSize);
-    return NULL;
+void convertUpdatedData(uint64_t *producedMessagesByte, uint64_t *queueSizeByte) {
+    producedMessagesByte = htonll(sharedBuf->producedMessages);  
+    queueSizeByte = htonll(sharedBuf->queueSize); 
 }
+
 
 int generateId(){
   pthread_mutex_lock(&client_id_mutex);
@@ -227,6 +230,15 @@ int generateId(){
   pthread_mutex_unlock(&client_id_mutex);
   return client_id;
 }
+
+uint64_t htonll(uint64_t value) {
+    return (((uint64_t)htonl(value)) << 32) + htonl(value >> 32);
+}
+
+uint64_t ntohll(uint64_t value) {
+    return (((uint64_t)ntohl(value)) << 32) + ntohl(value >> 32);
+}
+
 
 /*static void *readingProcess(void *arg){
   while(1){
