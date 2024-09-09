@@ -31,7 +31,6 @@ int main(int argc, char **argv)
   int queueSize;
   int receivedmessage;
   int len = sizeof(struct BufferDataMonitorServer);
-  unsigned int netLen = htonl(len);
 
   // Check number of arguments and get IP address and port
   if (argc < 3)
@@ -79,15 +78,7 @@ int main(int argc, char **argv)
 
   // Loop to continuously receive numbers from the server
   while (1)
-  {
-    /* Convert the integer number into network byte order */
-    /* Send number of characters */
-    if(send(sd, &netLen, sizeof(netLen), 0) == -1)
-    {
-      perror("send");
-      exit(1);
-    }
-    
+  { 
     // Receive the number from the server
     if (receive(sd, &producedMessage, sizeof(producedMessage)) == -1)
     {
@@ -125,39 +116,8 @@ int main(int argc, char **argv)
           printf("Consumer %d received:%d\n",i,ntohl(receivedmessage));
         }     
     }        
-
-
-    //print produced messages
-    // if(counter == 0){
-    //   printf("produced Messages %d\n",ntohl(receivedNumber));
-    //   counter++;
-    // }
-
-    // //print queue length
-    // if(counter == 1){
-    //   printf("Queue Length %d\n",ntohl(receivedNumber));
-    //   counter++;
-    // }
-
-    // //print received messages for every consumer
-    // // printf("num of consumers:%d",consumersAmt);
-    // if(counter >= 2){
-    //   // for(int i = 0;i<consumersAmt;++i){
-    //   printf("Consumer %d received:%d\n",consumer,ntohl(receivedNumber));
-    //   counter++;
-    //   consumer++;
-    //   // }
-
-    // }
-
-    //cehck if we are at the end of the counter loop
-    // if((counter + 1) % (1+consumersAmt) == 0){
-    //   counter = 0;
-    //   consumer = 0;
-    // }
-    // printf("Received number: %d\n", ntohl(receivedNumber));
   }
-
+  
   // Close the socket (never reached in this loop)
   close(sd);
   return 0;

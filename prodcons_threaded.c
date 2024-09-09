@@ -15,18 +15,11 @@ struct BufferData {
   int buffer[BUFFER_SIZE];
   int receivedMessagesPerConsumer[MAX_THREADS];
   int producedMessages;
-  
-  /* mutex to protect shared data */
-  pthread_mutex_t mutex;
-  
-  /* Condition variables to signal availability of room and data in the buffer */
-  pthread_cond_t roomAvailable;
-  pthread_cond_t dataAvailable;
-
-  /* readIdx is the index in the buffer of the next item to be retrieved */
-  int readIdx;
-  /* writeIdx is the index in the buffer of the next item to be inserted */
-  int writeIdx;
+  pthread_mutex_t mutex;  /* Mutex to protect shared data */
+  pthread_cond_t roomAvailable; /* Condition variable to signal availability of room in the buffer */
+  pthread_cond_t dataAvailable; /* Condition variable to signal availability of data in the buffer */
+  int readIdx;  /* index in the buffer of next item to be retrieved */
+  int writeIdx;  /* index in the buffer of the next item to be inserted */
   int consumersAmt;
 };
 
@@ -36,9 +29,9 @@ struct BufferDataMonitorServer *sharedBufMonitorServer;
 int numOfProducedMessages = 0;
 
 /* Definition of functions */
+static void *monitor(void *arg);
 static void *producer(void *arg);
 static void *consumer(void *arg);
-static void *monitor(void *arg);
 
 /* MAIN */
 int main(int argc, char *args[])
@@ -58,14 +51,23 @@ int main(int argc, char *args[])
   sscanf(args[1], "%d", &nConsumers);
 
 
-/* Set-up shared memory */
-  sharedMemId = shmget(SHM_KEY, sizeof(struct BufferData), IPC_CREAT | SHM_R | SHM_W);
+  /* Set-up of Shared Memory */
+  sharedMemId = shmget(SHM_KEY,                   // identifies shared memory segment b/w Prod and Con
+                      sizeof(struct BufferData),
+                      IPC_CREAT | SHM_R | SHM_W); //flags that control the behavior
+  
   if(sharedMemId == -1)
   {
     perror("Error in shmget");
     exit(0);
   }
-  sharedBuf = shmat(sharedMemId, NULL, 0);
+
+  /*
+  * Shmat() is the function that attaches the sh-mem segment identified (sharedMemId)
+  * to the address space of the calling process. It allows the process to access the 
+  * shared memory.
+  */
+  sharedBuf = shmat(sharedMemId, NULL, 0); 
   if(sharedBuf == (void *)-1)
   {
     perror("Error in shmat");

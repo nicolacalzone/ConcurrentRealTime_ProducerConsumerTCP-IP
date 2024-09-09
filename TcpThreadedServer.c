@@ -15,28 +15,25 @@
 
 /* Global variables */
 int exit_status = 0;
-int client_id = 0;
+int client_id = 1;
 pthread_mutex_t client_id_mutex = PTHREAD_MUTEX_INITIALIZER;
 struct BufferDataMonitorServer *sharedBuf;
 
 /* Definition of functions */
 static void *connectionHandler(void *arg);
-static void handleConnection(int currSd, int client_id);
-int getUpdatedData();
+static void handleConnection(int currSd, int clientId);
 int generateId();
 void handle_signal(int signal);
-uint64_t htonll(uint64_t value);
-uint64_t ntohll(uint64_t value);
-void convertUpdatedData(uint64_t *first, uint64_t *second);
+uint64_t htonll(uint64_t val);
+uint64_t ntohll(uint64_t val);
 
 /* MAIN */
 int main(int argc, char *argv[])
 {
-  int sd, *currSd;
-  int port, sharedMemId;;
+  int sd, port, sharedMemId;
+  int *currSd;
   struct sockaddr_in sin, retSin;
   pthread_t threads[MAX_THREADS];
-  //pthread_t serverReader;
 
   /* Set-up shared memory */
   sharedMemId = shmget(SHM_KEY_MONITOR_SERVER, sizeof(struct BufferDataMonitorServer), SHM_R);
@@ -45,7 +42,12 @@ int main(int argc, char *argv[])
     perror("Error in shmget");
     exit(0);
   }
-  /* Shared memory attach b/w sharedBuf and sharedMem segment */
+
+  /*
+  * Shmat() is the function that attaches the sh-mem segment identified (sharedMemId)
+  * to the address space of the calling process. It allows the process to access the 
+  * shared memory.
+  */  
   sharedBuf = shmat(sharedMemId, NULL, 0);
   if(sharedBuf == (void *)-1)
   {
@@ -57,10 +59,7 @@ int main(int argc, char *argv[])
   sharedBuf->producedMessages = 0;
   sharedBuf->queueSize = 0;
 
-  /* Create serverReader thread */
-  //pthread_create(&serverReader, NULL, readingProcess, NULL);
-
-  // Check for correct usage
+  /* Check for correct usage */
   if (argc < 2)
   {
     printf("Usage: server <port>\n");
@@ -75,7 +74,7 @@ int main(int argc, char *argv[])
     exit(1);
   }
 
-/* set socket options REUSE ADDRESS */
+  /* set socket options REUSE ADDRESS */
   int reuse = 1;
   if (setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0)
       perror("setsockopt(SO_REUSEADDR) failed");
@@ -119,19 +118,12 @@ int main(int argc, char *argv[])
     }
 
     /* Generate a unique client ID */
-    //pthread_mutex_lock(&client_id_mutex);
-    //currSd[1] = client_id_counter++;
-    //pthread_mutex_unlock(&client_id_mutex);
-
     currSd[1] = generateId();
 
     printf("Connection received from: %s with clientId: %d\n", inet_ntoa(retSin.sin_addr), currSd[1]);
 
     // Connection received, start a new thread serving the connection
     pthread_create(&threads[i], NULL, connectionHandler, currSd);
-
-    //signal(SIGINT, handle_signal);
-    //signal(SIGTSTP, handle_signal);
   }
 
   return 0; // never reached
@@ -171,9 +163,9 @@ static void handleConnection(int currSd, int client_id)
   {
     /* Gets update data from the shared buffer 
        and converts it to network byte order */
-    uint64_t producedMessagesNBO, queueSizeNBO;
-    convertUpdatedData(&producedMessagesNBO, &queueSizeNBO); 
-
+    int producedMessagesNBO, queueSizeNBO;
+    producedMessagesNBO = htonl(sharedBuf->producedMessages);  
+    queueSizeNBO = htonl(sharedBuf->queueSize); 
 
   /* Send Produced Messages */
     if (send(currSd, &producedMessagesNBO, sizeof(producedMessagesNBO), 0) == -1)
@@ -183,7 +175,7 @@ static void handleConnection(int currSd, int client_id)
     }
     else
     {
-      printf("produced: %ld to client %d\n", producedMessagesNBO, client_id);
+      printf("produced: %d to client %d\n", producedMessagesNBO, client_id);
     }
   /* Send Queue Size */
     if (send(currSd, &queueSizeNBO, sizeof(queueSizeNBO), 0) == -1)
@@ -199,7 +191,7 @@ static void handleConnection(int currSd, int client_id)
 
     for(int i = 0;i<sharedBuf->consumersAmt;++i){
       
-      uint64_t receivedMessagesByte = htonll(sharedBuf->receivedMessagesPerConsumer[i]);
+      int receivedMessagesByte = htonl(sharedBuf->receivedMessagesPerConsumer[i]);
         if (send(currSd, &receivedMessagesByte, sizeof(receivedMessagesByte), 0) == -1)
       {
         perror("Failed to send number");
@@ -217,38 +209,9 @@ static void handleConnection(int currSd, int client_id)
   close(currSd);
 }
 
-
-void convertUpdatedData(uint64_t *producedMessagesByte, uint64_t *queueSizeByte) {
-    producedMessagesByte = htonll(sharedBuf->producedMessages);  
-    queueSizeByte = htonll(sharedBuf->queueSize); 
-}
-
-
 int generateId(){
   pthread_mutex_lock(&client_id_mutex);
   client_id++;
   pthread_mutex_unlock(&client_id_mutex);
   return client_id;
 }
-
-uint64_t htonll(uint64_t value) {
-    return (((uint64_t)htonl(value)) << 32) + htonl(value >> 32);
-}
-
-uint64_t ntohll(uint64_t value) {
-    return (((uint64_t)ntohl(value)) << 32) + ntohl(value >> 32);
-}
-
-
-/*static void *readingProcess(void *arg){
-  while(1){
-    
-    printf("Number of messages in the queue: %lu\n", sharedBuf->queueSize);  
-    printf("Number of produced elements so far: %d\n",sharedBuf->producedMessages);
-
-    for (int i = 0; i<sharedBuf->consumersAmt; i++)
-      printf("consumer:%d, received: %d\n",i+1,sharedBuf->receivedMessagesPerConsumer[i]);
-
-    sleep(10);
-  }
-}*/
